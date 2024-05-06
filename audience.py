@@ -8,7 +8,7 @@ class Audience:
     server_ip = socket.gethostbyname(socket.gethostname())
     server_port = 6666
  
-    def __init__(self,host,port):
+    def __init__(self,host,port,window_name='Audience'):
         self.s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.ip = host
         self.port = port
@@ -18,7 +18,7 @@ class Audience:
         self.frame_queue = Queue()
         self.stop_event = threading.Event()
         self.receive_thread = threading.Thread(target=self.receive_frames)
-        self.display_thread = threading.Thread(target=self.display_frames, args=('Audience',))
+        self.display_thread = threading.Thread(target=self.display_frames, args=(window_name,))
  
     def start(self):
         self.receive_thread.start()
@@ -30,7 +30,7 @@ class Audience:
         self.stop_event.set()
         # self.receive_thread.join()
         print('Waiting for display thread to finish...')
-        self.display_thread.join()
+        # self.display_thread.join()
         print('Destroying windows...')
         cv2.destroyAllWindows()
         self.s.close()
@@ -57,14 +57,8 @@ class Audience:
                 data = self.frame_queue.get()
                 img = cv2.imdecode(data, cv2.IMREAD_COLOR)
                 cv2.imshow(window_name, img)
-                cv2.waitKey(25)
+                if cv2.waitKey(25) == ord('q'):
+                    print("Quitting...")
+                    self.stop()
             else:
                 continue
- 
-if __name__ == "__main__":
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    ip = socket.gethostbyname(socket.gethostname())
-    port = 6667
- 
-    audience = Audience(ip,port)
-    audience.start()
