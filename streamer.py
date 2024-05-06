@@ -13,6 +13,7 @@ class VideoStreamer:
         self.s.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 1000000)
         self.server_ip = server_ip
         self.server_port = server_port
+        self.clients = [(server_ip, server_port),(server_ip, server_port+1)]
         self.stop_event = threading.Event()
         self.frame_queue = Queue()
         self.video_stream_thread = threading.Thread(target=self.video_stream)
@@ -30,7 +31,8 @@ class VideoStreamer:
             print('Encoding image')
             x_as_bytes = pickle.dumps(buffer)
             try:
-                self.s.sendto((x_as_bytes), (self.server_ip, self.server_port))
+                for client in self.clients:
+                    self.s.sendto((x_as_bytes), client)
             except (ConnectionError, OSError) as e:
                 print(f'Error: {e}')
                 break
@@ -42,7 +44,9 @@ class VideoStreamer:
                 cv2.imshow('Streamer', frame)
                 if cv2.waitKey(1) == ord('q'):
                     self.stop_event.set()
-                    self.s.sendto(b'quit', (self.server_ip, self.server_port))  # Send 'quit' signal
+                    for client in self.clients:
+                        self.s.sendto(b'quit', client)
+                   
 
     def start(self):
         self.video_stream_thread.start()
