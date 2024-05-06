@@ -22,6 +22,8 @@ class VideoStreamer:
         self.accept_thread = threading.Thread(target=self.accept_Connection)
         self.video_stream_thread = threading.Thread(target=self.video_stream)
         self.display_thread = threading.Thread(target=self.display_frames)
+
+    
  
     def video_stream(self):
         while not self.stop_event.is_set() and self.cap.isOpened():

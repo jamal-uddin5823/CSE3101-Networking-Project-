@@ -18,7 +18,7 @@ class Audience:
         self.frame_queue = Queue()
         self.stop_event = threading.Event()
         self.receive_thread = threading.Thread(target=self.receive_frames)
-        self.display_thread = threading.Thread(target=self.display_frames, args=('Audience 2',))
+        self.display_thread = threading.Thread(target=self.display_frames, args=('Audience 3',))
  
     def start(self):
         self.receive_thread.start()
@@ -56,14 +56,15 @@ class Audience:
                 data = self.frame_queue.get()
                 img = cv2.imdecode(data, cv2.IMREAD_COLOR)
                 cv2.imshow(window_name, img)
-                cv2.waitKey(1)
+                if cv2.waitKey(25) == ord('q'):
+                    self.stop()
             else:
                 continue
  
 if __name__ == "__main__":
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     ip = socket.gethostbyname(socket.gethostname())
-    port = 6668
+    port = 6669
  
     audience = Audience(ip,port)
     audience.start()
