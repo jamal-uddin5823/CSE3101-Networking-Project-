@@ -25,6 +25,7 @@ class Audience:
         self.display_thread.start()
  
     def stop(self):
+        self.s.sendto(b'quit',(Audience.server_ip, Audience.server_port))
         print('Cleaning up...')
         self.stop_event.set()
         # self.receive_thread.join()

@@ -64,6 +64,9 @@ class VideoStreamer:
                 if data == b'INIT':
                     print(f'Connection established with {addr}')
                     self.clients.append(addr)
+                elif data == b'quit':
+                    print(f'Connection closed by {addr}')
+                    self.clients.remove(addr)
                 else:
                     print("Connection rejected")
             except:
