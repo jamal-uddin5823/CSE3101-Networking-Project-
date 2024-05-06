@@ -76,6 +76,7 @@ class VideoStreamer:
         self.display_thread.start()
  
     def stop(self):
+        self.s.close()
         print('Cleaning up...')
         self.stop_event.set()
         print('Destroying window...')
@@ -84,10 +85,10 @@ class VideoStreamer:
         self.cap.release()
         print('Closing video stream thread...')
         self.video_stream_thread.join()
-        print('Closing accept thread...')
-        self.accept_thread.join()
+        # print('Closing accept thread...')
+        # self.accept_thread.join()
         print('Closing display thread...')
-        self.display_thread.join()
+        # self.display_thread.join()
         exit()
  
 if __name__ == "__main__":
@@ -97,7 +98,7 @@ if __name__ == "__main__":
     streamer.start()
  
     if cv2.waitKey(25) == ord('q'):
-        print("Quitting...")
+        print("Quitting... from here")
         for client in streamer.clients:
             streamer.s.sendto(b'quit', client)
         streamer.stop()

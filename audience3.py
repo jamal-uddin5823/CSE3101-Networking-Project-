@@ -56,8 +56,7 @@ class Audience:
                 data = self.frame_queue.get()
                 img = cv2.imdecode(data, cv2.IMREAD_COLOR)
                 cv2.imshow(window_name, img)
-                if cv2.waitKey(25) == ord('q'):
-                    self.stop()
+                cv2.waitKey(25)
             else:
                 continue
  
