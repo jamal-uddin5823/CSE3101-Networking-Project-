@@ -4,47 +4,63 @@ import pickle
 import threading
 from queue import Queue
 
-def receive_frames(s, frame_queue, stop_event):
-    while not stop_event.is_set():
-        try:
-            data, _ = s.recvfrom(1000000)
-            if data == b'quit':  # Check for 'quit' signal
-                stop_event.set()
-                break
-            data = pickle.loads(data)
-            frame_queue.put(data)
-        except (ConnectionResetError, OSError):
-            print("Connection reset or error occurred. Exiting...")
-            stop_event.set()
-            break
+class Audience:
+    server_ip = socket.gethostbyname(socket.gethostname())
+    server_port = 6666
 
-def display_frames(frame_queue, window_name, stop_event):
-    while not stop_event.is_set():
-        if not frame_queue.empty():
-            data = frame_queue.get()
-            img = cv2.imdecode(data, cv2.IMREAD_COLOR)
-            cv2.imshow(window_name, img)
-            cv2.waitKey(1)
-        else:
-            continue
+    def __init__(self,host,port):
+        self.s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.ip = host
+        self.port = port
+        self.s.bind((self.ip, self.port))
+        print('Connected to audience at', self.ip, self.port)
+        self.s.sendto(b'INIT',(Audience.server_ip, Audience.server_port))
+        self.frame_queue = Queue()
+        self.stop_event = threading.Event()
+        self.receive_thread = threading.Thread(target=self.receive_frames)
+        self.display_thread = threading.Thread(target=self.display_frames, args=('Audience',))
+
+    def start(self):
+        self.receive_thread.start()
+        self.display_thread.start()
+    
+    def stop(self):
+        self.stop_event.set()
+        self.receive_thread.join()
+        self.display_thread.join()
+        cv2.destroyAllWindows()
+        self.s.close()
+        exit()
+
+
+    def receive_frames(self):
+        while not self.stop_event.is_set():
+            try:
+                data, _ = self.s.recvfrom(1000000)
+                if data == b'quit':  # Check for 'quit' signal
+                    print("Quitting...")
+                    self.stop()
+
+                data = pickle.loads(data)
+                self.frame_queue.put(data)
+            except (ConnectionResetError, OSError):
+                print("Connection reset or error occurred. Exiting...")
+                self.stop()
+
+    def display_frames(self, window_name):
+        while not self.stop_event.is_set():
+            if not self.frame_queue.empty():
+                data = self.frame_queue.get()
+                img = cv2.imdecode(data, cv2.IMREAD_COLOR)
+                cv2.imshow(window_name, img)
+                cv2.waitKey(1)
+            else:
+                continue
 
 if __name__ == "__main__":
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     ip = socket.gethostbyname(socket.gethostname())
-    port = 6666
-    s.bind((ip, port))
+    port = 6667
 
-    frame_queue = Queue()
-    stop_event = threading.Event()
-
-    receive_thread = threading.Thread(target=receive_frames, args=(s, frame_queue, stop_event))
-    receive_thread.start()
-
-    display_thread = threading.Thread(target=display_frames, args=(frame_queue, 'Audience', stop_event))
-    display_thread.start()
-
-    display_thread.join()
-    receive_thread.join()
-
-    cv2.destroyAllWindows()
-    s.close()
+    audience = Audience(ip,port)
+    audience.start()

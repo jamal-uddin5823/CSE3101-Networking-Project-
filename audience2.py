@@ -9,8 +9,10 @@ def receive_frames(s, frame_queue, stop_event):
         try:
             data, _ = s.recvfrom(1000000)
             if data == b'quit':  # Check for 'quit' signal
+                print("Quitting...")
                 stop_event.set()
-                break
+                exit()
+                
             data = pickle.loads(data)
             frame_queue.put(data)
         except (ConnectionResetError, OSError):
@@ -31,8 +33,10 @@ def display_frames(frame_queue, window_name, stop_event):
 if __name__ == "__main__":
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     ip = socket.gethostbyname(socket.gethostname())
-    port = 6667
+    port = 6668
     s.bind((ip, port))
+
+    s.sendto(b'INIT',(ip, 6666))
 
     frame_queue = Queue()
     stop_event = threading.Event()

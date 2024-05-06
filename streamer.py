@@ -6,6 +6,7 @@ from queue import Queue
 
 class VideoStreamer:
     def __init__(self, server_ip, server_port):
+        print("Accessing camera...")
         self.cap = cv2.VideoCapture(0)
         self.cap.set(3, 640)
         self.cap.set(4, 480)
@@ -13,9 +14,12 @@ class VideoStreamer:
         self.s.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 1000000)
         self.server_ip = server_ip
         self.server_port = server_port
-        self.clients = [(server_ip, server_port),(server_ip, server_port+1)]
+        print('Connected to audience at', server_ip, server_port)
+        self.s.bind((server_ip, server_port))
+        self.clients = []
         self.stop_event = threading.Event()
         self.frame_queue = Queue()
+        self.accept_thread = threading.Thread(target=self.accept_Connection)
         self.video_stream_thread = threading.Thread(target=self.video_stream)
         self.display_thread = threading.Thread(target=self.display_frames)
 
@@ -25,10 +29,8 @@ class VideoStreamer:
             if not ret:
                 print("Error reading frame")
                 continue
-            print('Reading image')
             self.frame_queue.put(img)
             ret, buffer = cv2.imencode(".jpg", img, [int(cv2.IMWRITE_JPEG_QUALITY), 30])
-            print('Encoding image')
             x_as_bytes = pickle.dumps(buffer)
             try:
                 for client in self.clients:
@@ -43,21 +45,36 @@ class VideoStreamer:
                 frame = self.frame_queue.get()
                 cv2.imshow('Streamer', frame)
                 if cv2.waitKey(1) == ord('q'):
-                    self.stop_event.set()
+                    print("Quitting...")
                     for client in self.clients:
                         self.s.sendto(b'quit', client)
-                   
+                    self.stop()
+    
+    def accept_Connection(self):
+        print("Waiting for connections")
+        while True:
+            data, _ = self.s.recvfrom(1000000)
+            if data == b'INIT':
+                print(f'Connection established with {_}')
+                self.clients.append(_)
+            else:
+                print("Connection rejected")
+
 
     def start(self):
+        self.accept_thread.start()
         self.video_stream_thread.start()
         self.display_thread.start()
 
+
     def stop(self):
         self.stop_event.set()
+        self.accept_thread.join()
         self.video_stream_thread.join()
         self.display_thread.join()
         self.cap.release()
         cv2.destroyAllWindows()
+        exit()
 
 if __name__ == "__main__":
     server_ip = socket.gethostbyname(socket.gethostname())
