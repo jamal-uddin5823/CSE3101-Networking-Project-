@@ -1,3 +1,4 @@
+import struct
 import os
 import pickle
 import socket
@@ -88,7 +89,14 @@ class Client:
         print('entered write')
         try:
             message = f"{self.nickname} : {self.input_area.get('1.0', 'end')}"
-            self.sock.send(("_m_" + message).encode('utf-8'))
+            
+            self.sock.send(("_me_" + message).encode('utf-8'))
+            print('Message sent')
+            # ack=self.sock.recv(1024)
+            # if ack.decode('utf-8') == 'ACK':
+            #     print('Message sent')
+            # else:
+            #     raise OSError('ACK Message not received')
             self.input_area.delete('1.0', 'end')
         except OSError as e:
             print(f"Error sending message: {e}")
@@ -97,13 +105,17 @@ class Client:
         print("entered into the receive method")
         while self.running:
             try:
-                message = self.sock.recv(1024).decode('utf-8')
+                message = self.sock.recv(1024)
+                print(f'Message received: {message}')
+                message = message.decode('utf-8')
                 print(f'Server Nickname received : {message}')
                 if message == 'NICK':
                     print("Client nickname: " + self.nickname)
                     self.sock.send(self.nickname.encode('utf-8'))
 
                     print('Client nickname: (Meherun) sent to the server')
+                if message == 'FILE':
+                    self.receiveFile()
                 else:
                     if self.gui_done:
                         self.text_area.config(state='normal')
@@ -113,8 +125,8 @@ class Client:
 
             except ConnectionAbortedError:
                 break
-            except:
-                print("Error")
+            except Exception as e:
+                print("Error",e)
                 self.sock.close()
                 break
 
@@ -130,13 +142,21 @@ class Client:
         ), title="Select Image File", filetypes=(('Text files', '*.txt'), ('All files', '*.*')))
                
     def sendFile(self):
-        self.sock.send('file'.encode('utf-8'))
+        global filename
         try:
+            self.sock.send('file'.encode('utf-8'))
+            # ack=self.sock.recv(1024)
+            # if ack.decode('utf-8') == 'ACK':
+            #     print('File sending started')
+            # else:
+            #     raise OSError('ACK file not received')
             with open(filename,'rb') as f:
                 content = f.read()
+            lst = filename.split('/')
+            filepath = lst[-1]
             response = {
                 'status': 'OK',
-                'filename': filename,
+                'filename': filepath,
                 'content': content
             }
             success = True
@@ -150,6 +170,7 @@ class Client:
 
         response = pickle.dumps(response)
         self.sock.send(f'{len(response)}'.encode())
+        print(f'file sent size: {len(response)}')
 
         total_size = len(response)
 
@@ -168,8 +189,26 @@ class Client:
         if success: print(f'Uploaded {filename}')
         else: print('Try again.')
         
-    def receiveFile():
-        pass
+    def receiveFile(self):
+        try:
+            print('entered into the receiveFile method')
+            message = self.sock.recv(1024)
+            print(f'Message received: {message}')
+            message = pickle.loads(message)
+            print(f'Message received: {message}')
+            filename = message['filename']
+            content = message['content']
+            print(f'Filename: {filename}')
+            print(f'Content: {content}')
+            if not os.path.exists(self.nickname):
+                os.makedirs(self.nickname)
+            filepath=os.path.join(self.nickname,filename)
+            with open(filepath, 'wb') as f:
+                f.write(content)
+
+            print(f'File received: {filename}')
+        except Exception as e:
+            print(f'Error: {e}')
 
 client = Client(HOST, PORT)
 client.gui_loop()

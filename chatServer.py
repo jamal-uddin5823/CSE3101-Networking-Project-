@@ -30,6 +30,9 @@ def broadcastFile(filepath):
     print(filename)
 
     for client in clients:
+        client.send('FILE'.encode('utf-8'))
+
+    for client in clients:
         try:
             with open(filepath, 'rb') as f:
                 content = f.read()
@@ -104,21 +107,24 @@ def handle(client):
         try:
             print("handle client entered")
             message = client.recv(1024).decode('utf-8')
+            # client.send('ACK'.encode('utf-8'))
             print("handle client entered 2")
             print(message)
-            code = message[:3]
+            code = message[:4]
             print("code : " + code)
 
-            if (code == '_m_'):
-                message = message[3:]
+            if (code == '_me_'):
+                message = message[4:]
                 message = message.encode('utf-8')
 
                 print(message)
                 print(f"{nicknames[clients.index(client)]}")
                 broadcast(message)
                 print("broadcast message done")
-            else:
+            elif (code == 'file'):
                 receiveFile(client)
+            else:
+                raise Exception("Invalid code")
         except:
             index = clients.index(client)
             clients.remove(client)
@@ -133,7 +139,7 @@ def receiveFile(client):
     try:
         print("into receive method")
         length = client.recv(1024)  # 39 in client
-        print(length)
+        print(f'Length: {length}')
         length = length.decode()
         response = b''
         got_len = 0
@@ -149,7 +155,9 @@ def receiveFile(client):
             return
 
         filepath = os.path.join('./server_files', response['filename'])
-        print(filepath)
+        print(f'Filepath: {filepath}')
+
+        print(f'Received content: {response["content"]}')
 
         with open(filepath, 'wb') as f:
             f.write(response['content'])
