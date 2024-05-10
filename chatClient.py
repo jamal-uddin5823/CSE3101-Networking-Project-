@@ -13,6 +13,13 @@ HOST = socket.gethostbyname(socket.gethostname())
 PORT = 9000
 sock: socket.socket
 
+# TCP Reno Parameters
+SSTHRESH = 65535  # Initial slow start threshold
+CWND = 1  # Initial congestion window size
+
+# Flow Control Parameters
+RWND = 65535  # Receiver window size
+
 class Client:
     def __init__(self, host, port):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -74,10 +81,10 @@ class Client:
         self.send_file_button.config(font=("Arial", 12))
         self.send_file_button.pack(padx=50, pady=5)
 
-        self.recv_file_button = tkinter.Button(
-            self.win, text="Receive File", command=self.receiveFile)
-        self.recv_file_button.config(font=("Arial", 12))
-        self.recv_file_button.pack(padx=50, pady=5)
+        # self.recv_file_button = tkinter.Button(
+        #     self.win, text="Receive File", command=self.receiveFile)
+        # self.recv_file_button.config(font=("Arial", 12))
+        # self.recv_file_button.pack(padx=50, pady=5)
 
         self.gui_done = True
 
@@ -108,14 +115,15 @@ class Client:
                 message = self.sock.recv(1024)
                 print(f'Message received: {message}')
                 message = message.decode('utf-8')
+                print(f'Message received: {message}')
                 print(f'Server Nickname received : {message}')
                 if message == 'NICK':
                     print("Client nickname: " + self.nickname)
                     self.sock.send(self.nickname.encode('utf-8'))
 
                     print('Client nickname: (Meherun) sent to the server')
-                if message == 'FILE':
-                    self.receiveFile()
+                if message.startswith('FILE'):
+                    self.receiveFile(message)
                 else:
                     if self.gui_done:
                         self.text_area.config(state='normal')
@@ -145,11 +153,7 @@ class Client:
         global filename
         try:
             self.sock.send('file'.encode('utf-8'))
-            # ack=self.sock.recv(1024)
-            # if ack.decode('utf-8') == 'ACK':
-            #     print('File sending started')
-            # else:
-            #     raise OSError('ACK file not received')
+
             with open(filename,'rb') as f:
                 content = f.read()
             lst = filename.split('/')
@@ -189,24 +193,54 @@ class Client:
         if success: print(f'Uploaded {filename}')
         else: print('Try again.')
         
-    def receiveFile(self):
+    def receiveFile(self,message):
+        rwnd = RWND
+
         try:
-            print('entered into the receiveFile method')
-            message = self.sock.recv(1024)
-            print(f'Message received: {message}')
-            message = pickle.loads(message)
-            print(f'Message received: {message}')
-            filename = message['filename']
-            content = message['content']
-            print(f'Filename: {filename}')
-            print(f'Content: {content}')
+            file, filename, total_size = message.split(' ')
+            print(f'Receiving file: {filename}\nTotal size: {total_size}')
+            total_size = int(total_size)
+            data = b''
+            received_size = 0
+            expected_seq_num = 0
+
+            while received_size < total_size:
+                header = self.sock.recv(5)
+                seq_num, chunk_len = struct.unpack('!IB', header)
+
+                if seq_num == expected_seq_num:
+                    print('Received chunk')
+                    chunk = self.sock.recv(chunk_len)
+                    print(f'Chunk size: {len(chunk)}')
+                    print(f'Chunk: {chunk}')
+                    data += chunk
+                    received_size += chunk_len
+
+                    # Send ACK
+                    print(f'Sending ACK: {seq_num + chunk_len} to server {self.sock}')
+                    self.sock.send(struct.pack('!I', seq_num + chunk_len))
+                    expected_seq_num += chunk_len
+                else:
+                    print(f'Expected: {expected_seq_num}, Received: {seq_num}')
+                    # Duplicate or out-of-order packet
+                    self.sock.send(struct.pack('!I', expected_seq_num))
+
+            content = data.decode('utf-8')
+            response = {
+                'status': 'OK',
+                'filename': filename,
+                'content': content
+            }
+
             if not os.path.exists(self.nickname):
                 os.makedirs(self.nickname)
-            filepath=os.path.join(self.nickname,filename)
+
+            filepath = os.path.join(self.nickname, filename)
             with open(filepath, 'wb') as f:
-                f.write(content)
+                f.write(content.encode('utf-8'))
 
             print(f'File received: {filename}')
+
         except Exception as e:
             print(f'Error: {e}')
 
