@@ -42,23 +42,43 @@ class Audience:
         self.receive_audio_thread.start()
         self.display_thread.start()
 
-    def stop(self):
+    def stop_video(self):
         self.video_socket.sendto(b'quit', (Audience.server_ip, Audience.server_video_port))
-        self.audio_socket.sendto(b'quit', (Audience.server_ip, Audience.server_audio_port))
         print('Cleaning up...')
         self.stop_event.set()
-        # self.receive_video_thread.join()
-        # self.receive_audio_thread.join()
-        print('Waiting for display thread to finish...')
-        # self.display_thread.join()
+        self.video_socket.close()
         print('Destroying windows...')
         cv2.destroyAllWindows()
         print('Closing sockets and streams...')
         self.video_socket.close()
+
+    def stop_audio(self):
+        self.audio_socket.sendto(b'quit', (Audience.server_ip, Audience.server_audio_port))
         self.audio_socket.close()
         self.audio_stream.stop_stream()
         self.audio_stream.close()
         self.audio.terminate()
+
+
+    def stop(self):
+        self.stop_video()
+        self.stop_audio()
+        # self.video_socket.sendto(b'quit', (Audience.server_ip, Audience.server_video_port))
+        # self.audio_socket.sendto(b'quit', (Audience.server_ip, Audience.server_audio_port))
+        # print('Cleaning up...')
+        # self.stop_event.set()
+        # # self.receive_video_thread.join()
+        # # self.receive_audio_thread.join()
+        # print('Waiting for display thread to finish...')
+        # # self.display_thread.join()
+        # print('Destroying windows...')
+        # cv2.destroyAllWindows()
+        # print('Closing sockets and streams...')
+        # self.video_socket.close()
+        # self.audio_socket.close()
+        # self.audio_stream.stop_stream()
+        # self.audio_stream.close()
+        # self.audio.terminate()
         exit()
 
     def receive_frames(self):
