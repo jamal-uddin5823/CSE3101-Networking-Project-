@@ -21,7 +21,7 @@ def broadcast(message):
         client.send(message)
 
 
-def broadcastFile(filepath):
+def broadcastFile(filepath,nickname):
     print("starting to broadcast the file")
 
     filename = os.path.basename(filepath)
@@ -30,7 +30,7 @@ def broadcastFile(filepath):
     print(filename)
 
     for client in clients:
-        client.send('FILE'.encode('utf-8'))
+        client.send(f'FILE {nickname}'.encode('utf-8'))
 
     for client in clients:
         try:
@@ -122,7 +122,7 @@ def handle(client):
                 broadcast(message)
                 print("broadcast message done")
             elif (code == 'file'):
-                receiveFile(client)
+                receiveFile(client,nicknames[clients.index(client)])
             else:
                 raise Exception("Invalid code")
         except:
@@ -135,7 +135,7 @@ def handle(client):
             break
 
 
-def receiveFile(client):
+def receiveFile(client,nickname):
     try:
         print("into receive method")
         length = client.recv(1024)  # 39 in client
@@ -163,7 +163,7 @@ def receiveFile(client):
             f.write(response['content'])
 
         print('Received')
-        broadcastFile(filepath)
+        broadcastFile(filepath,nickname)
 
     except Exception as e:
         print(f"Error: {e}")

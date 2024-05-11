@@ -114,8 +114,9 @@ class Client:
                     self.sock.send(self.nickname.encode('utf-8'))
 
                     print('Client nickname: (Meherun) sent to the server')
-                if message == 'FILE':
-                    self.receiveFile()
+                if message.startswith('FILE'):
+                    file,nickname = message.split(' ')
+                    self.receiveFile(nickname)
                 else:
                     if self.gui_done:
                         self.text_area.config(state='normal')
@@ -189,7 +190,7 @@ class Client:
         if success: print(f'Uploaded {filename}')
         else: print('Try again.')
         
-    def receiveFile(self):
+    def receiveFile(self,nickname):
         try:
             print('entered into the receiveFile method')
             message = self.sock.recv(1024)
@@ -207,6 +208,13 @@ class Client:
                 f.write(content)
 
             print(f'File received: {filename}')
+
+            if self.gui_done:
+                self.text_area.config(state='normal')
+                self.text_area.insert('end', f'{nickname} sent a file: {filename}\n')
+                self.text_area.yview('end')
+                self.text_area.config(state='disabled')
+            
         except Exception as e:
             print(f'Error: {e}')
 
