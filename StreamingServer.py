@@ -226,7 +226,7 @@ class StreamingServer:
             got_len = 0
             while got_len < int(length):
                 data = client.recv(1024)
-                print(data)
+                # print(data)
                 response += data
                 got_len += len(data)
 
@@ -240,7 +240,7 @@ class StreamingServer:
             filepath = os.path.join('./server_files', response['filename'])
             print(f'Filepath: {filepath}')
 
-            print(f'Received content: {response["content"]}')
+            # print(f'Received content: {response["content"]}')
 
             with open(filepath, 'wb') as f:
                 f.write(response['content'])
@@ -257,18 +257,26 @@ class StreamingServer:
         filename = os.path.basename(filepath)
         print(filepath)
         print(filename)
+        total_size = os.path.getsize(filepath)
 
         for client in self.chat_clients:
             client.send(f'FILE {nickname} {filename}'.encode('utf-8'))
 
         try:
-            with open(filepath, 'rb') as f:
-                chunk = f.read(4096)  # Read the first chunk
-                while chunk:
-                    for client in self.chat_clients:
-                        client.send(chunk)  # Send the chunk to each client
-                    chunk = f.read(4096)  # Read the next chunk
-            print(f'Broadcast {filename} to all clients')
+            with tqdm.tqdm(total=total_size,unit='B',unit_scale=True,unit_divisor=4096) as progress: 
+                sent_len = 0
+
+                while sent_len < total_size:
+                    with open(filepath, 'rb') as f:
+                        chunk = f.read(4096)  # Read the first chunk
+                        while chunk:
+                            for client in self.chat_clients:
+                                client.send(chunk)  # Send the chunk to each client
+                            sent_len += len(chunk)
+                            chunk = f.read(4096)  # Read the next chunk
+                    print(f'Broadcast {filename} to all clients')
+                for client in self.chat_clients:
+                    client.send(b'DONE')
         except FileNotFoundError:
             print('File does not exist')
 

@@ -11,6 +11,8 @@ from tkinter import PhotoImage, Toplevel, simpledialog
 from tkinter import filedialog
 import tqdm # type: ignore
 import os
+from tkinter import ttk
+from PIL import ImageTk, Image
 
 # Global variables for TCP
 cwnd = 1  # Congestion window size (in segments)
@@ -76,44 +78,51 @@ class Audience:
         
     def gui_loop(self):
         self.win = tkinter.Tk()
-        self.win.configure(bg="lightgray")
-
-        self.chat_label = tkinter.Label(
-            self.win, text="Chat: ", bg="lightgray")
-        self.chat_label.configure(font=("Arial", 12))
-        self.chat_label.pack(padx=20, pady=5)
-
-        self.text_area = tkinter.scrolledtext.ScrolledText(self.win)
-        self.text_area.pack(padx=20, pady=5)
-        self.text_area.config(state='disabled')
-
-        self.msg_label = tkinter.Label(
-            self.win, text="message: ", bg="lightgray")
-        self.msg_label.configure(font=("Arial", 12))
-        self.msg_label.pack(padx=20, pady=5)
-
-        self.input_area = tkinter.Text(self.win, height=3)
-        self.input_area.pack(padx=20, pady=5)
-
-        self.send_button = tkinter.Button(
-            self.win, text="Send Text", command=self.write)
-        self.send_button.config(font=("Arial", 12))
-        self.send_button.pack(padx=20, pady=5)
+        self.win.title("ShouldStream")
         
-        self.select_file_button = tkinter.Button(
-            self.win, text="Select File", command=self.selectFile)
-        self.select_file_button.config(font=("Arial", 12))
-        self.select_file_button.pack(padx=50, pady=5)
+        global bg_color, text_field_color
+        bg_color = "#706D91"
+        text_field_color = "#CCCCCC"
+        button_color = "#CFC3E3"
+        
 
-        self.send_file_button = tkinter.Button(
-            self.win, text="Send File", command=self.sendFile)
-        self.send_file_button.config(font=("Arial", 12))
-        self.send_file_button.pack(padx=50, pady=5)
+        global main_frame
+        main_frame = tkinter.Frame(self.win, background=bg_color)
+        main_frame.pack(fill=tkinter.BOTH, expand=True)
+
+        # Create labels and text areas
+        self.chat_label = ttk.Label(main_frame, background=bg_color, text="Chat Room", font=("Georgia", 20, "bold"), foreground="white")
+        self.chat_label.pack(padx=20, pady=(20, 5), anchor="center")
+
+        self.text_area = tkinter.scrolledtext.ScrolledText(main_frame, bg=text_field_color, font=("Georgia", 17), height=15)
+        self.text_area.pack(fill=tkinter.BOTH, expand=True, padx=20, pady=5)
+
+        self.msg_label = ttk.Label(main_frame, background=bg_color, text="Text Your Message", font=("Georgia", 20, "bold"), foreground="white")
+        self.msg_label.pack(padx=20, pady=(5, 5), anchor="center")
+
+        self.input_area = tkinter.Text(main_frame, height=3, bg=text_field_color, font=("Georgia", 17))
+        self.input_area.pack(fill=tkinter.BOTH, expand=True, padx=20, pady=(0, 5))
+        
+        # Create buttons
+        global button_frame
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(padx=20, pady=(0, 20), anchor="e")
+                
+        # send_icon = PhotoImage(file="sendIcon.png")
+        self.send_button = tkinter.Button(button_frame, text = "Send Text", bg = button_color, command=self.write)
+        self.send_button.pack(side=tkinter.LEFT, padx=(0, 10))
+        
+        self.select_file_button = tkinter.Button(button_frame, text="Select File", bg = button_color, command=self.selectFile)
+        self.select_file_button.pack(side=tkinter.LEFT, padx=(0, 10))
+
+        self.send_file_button = tkinter.Button(button_frame, text="Send File", bg = button_color, command=self.sendFile)
+        self.send_file_button.pack(side=tkinter.LEFT)
+
+        # Make the window resizable
+        self.win.resizable(True, True)
 
         self.gui_done = True
-
         self.win.protocol("WM_DELETE_WINDOW", self.stop)
-
         self.win.mainloop()
 
     def write(self):
@@ -267,7 +276,7 @@ class Audience:
                 chunk = response[sent_len:sent_len+chunk_size]
                 sent_len += len(chunk)
                 self.chat_socket.send(chunk)
-                print(chunk)
+                # print(chunk)
                 progress.update(len(chunk))
 
 
@@ -283,6 +292,8 @@ class Audience:
             with open(filepath, 'wb') as f:
                 while True:
                     chunk = self.chat_socket.recv(4096)
+                    if chunk == b'DONE':
+                        break
                     if not chunk:
                         break
                     f.write(chunk)
