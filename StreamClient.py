@@ -12,10 +12,12 @@ from tkinter import filedialog
 import tqdm # type: ignore
 import os
 
+# Global variables for TCP
 cwnd = 1  # Congestion window size (in segments)
 ssthresh = 65535  # Slow start threshold
 duplicate_acks = 0  # Counter for duplicate ACKs
-
+rtt = 0.5  # Estimated round-trip time (in seconds)
+timeout = 2 * rtt  # Timeout duration (in seconds)
 
 class Audience:
     server_ip = socket.gethostbyname(socket.gethostname())
@@ -139,7 +141,7 @@ class Audience:
                     print("Client nickname: " + self.nickname)
                     self.chat_socket.send(self.nickname.encode('utf-8'))
 
-                    print(f'Client nickname: {nickname} sent to the server')
+                    print(f'Client nickname: {self.nickname} sent to the server')
                 if message.startswith('FILE'):
                     file,nickname,filename = message.split(' ')
                     self.receiveFile(nickname,filename)
@@ -162,6 +164,74 @@ class Audience:
         filename = filedialog.askopenfilename(initialdir=os.getcwd(
         ), title="Select Image File", filetypes=(('Text files', '*.txt'), ('All files', '*.*')))
     
+    def fileSend(self):
+        global cwnd, ssthresh, duplicate_acks
+
+        try:
+            self.chat_socket.send('file'.encode('utf-8'))
+            with open(filename, 'rb') as f:
+                content = f.read()
+            lst = filename.split('/')
+            filepath = lst[-1]
+            response = {
+                'status': 'OK',
+                'filename': filepath,
+                'content': content
+            }
+            success = True
+        except FileNotFoundError:
+            print('File does not exist')
+            response = {
+                'status': 'ERROR',
+            }
+            success = False
+
+        response = pickle.dumps(response)
+        total_size = len(response)
+        sent_len = 0
+        segment_size = max(cwnd, 1) * 1024  # Assuming 1 segment = 1024 bytes
+
+        while sent_len < total_size:
+            start_time = time.time()
+            end_time = start_time + timeout
+
+            while time.time() < end_time:
+                chunk_size = min(segment_size, total_size - sent_len)
+                chunk = response[sent_len:sent_len + chunk_size]
+                self.chat_socket.send(chunk)
+                sent_len += len(chunk)
+
+                # Slow start
+                if cwnd < ssthresh:
+                    cwnd += 1
+
+                # Congestion avoidance
+                else:
+                    cwnd += 1 / cwnd
+
+                # Wait for ACK or timeout
+                try:
+                    ack = self.chat_socket.recv(1024)
+                    if ack == b'ACK':
+                        duplicate_acks = 0
+                    elif ack == b'DUPACK':
+                        duplicate_acks += 1
+
+                        # Fast retransmit
+                        if duplicate_acks >= 3:
+                            ssthresh = cwnd / 2
+                            cwnd = ssthresh + 3
+                            # Retransmit lost segment
+                except socket.timeout:
+                    # Timeout, retransmit lost segment
+                    ssthresh = cwnd / 2
+                    cwnd = 1
+
+        if success:
+            print(f'Uploaded {filename}')
+        else:
+            print('Try again.')
+
     def sendFile(self):
         global filename
         try:
@@ -189,7 +259,6 @@ class Audience:
         print(f'file sent size: {len(response)}')
 
         total_size = len(response)
-
         with tqdm.tqdm(total=total_size,unit='B',unit_scale=True,unit_divisor=1024) as progress: 
             sent_len = 0
             chunk_size = 4096
@@ -204,75 +273,7 @@ class Audience:
 
         if success: print(f'Uploaded {filename}')
         else: print('Try again.')
-    # def sendFile(self):
-    #     global cwnd, ssthresh, duplicate_acks
-
-    #     try:
-    #         self.chat_socket.send('file'.encode('utf-8'))
-    #         with open(filename, 'rb') as f:
-    #             content = f.read()
-    #         lst = filename.split('/')
-    #         filepath = lst[-1]
-    #         response = {
-    #             'status': 'OK',
-    #             'filename': filepath,
-    #             'content': content
-    #         }
-    #         success = True
-    #     except FileNotFoundError:
-    #         print('File does not exist')
-    #         response = {
-    #             'status': 'ERROR',
-    #         }
-    #         success = False
-
-    #     response = pickle.dumps(response)
-    #     total_size = len(response)
-    #     self.chat_socket.send(f'{total_size}'.encode())
-    #     sent_len = 0
-    #     segment_size = max(cwnd, 1) * 1024  # Assuming 1 segment = 1024 bytes
-
-    #     while sent_len < total_size:
-    #         start_time = time.time()
-    #         end_time = start_time + 1  # Timeout after 1 second
-
-    #         while time.time() < end_time:
-    #             chunk_size = min(segment_size, total_size - sent_len)
-    #             chunk = response[sent_len:sent_len + chunk_size]
-    #             self.chat_socket.send(chunk)
-    #             sent_len += len(chunk)
-
-    #             # Slow start
-    #             if cwnd < ssthresh:
-    #                 cwnd += 1
-
-    #             # Congestion avoidance
-    #             else:
-    #                 cwnd += 1 / cwnd
-
-    #             # Wait for ACK or timeout
-    #             try:
-    #                 ack = self.chat_socket.recv(1024)
-    #                 if ack == b'ACK':
-    #                     duplicate_acks = 0
-    #                 elif ack == b'DUPACK':
-    #                     duplicate_acks += 1
-
-    #                     # Fast retransmit
-    #                     if duplicate_acks >= 3:
-    #                         ssthresh = cwnd / 2
-    #                         cwnd = ssthresh + 3
-    #                         # Retransmit lost segment
-    #             except socket.timeout:
-    #                 # Timeout, retransmit lost segment
-    #                 ssthresh = cwnd / 2
-    #                 cwnd = 1
-
-    #     if success:
-    #         print(f'Uploaded {filename}')
-    #     else:
-    #         print('Try again.')
-
+    
     def receiveFile(self, nickname,filename):
         try:
             

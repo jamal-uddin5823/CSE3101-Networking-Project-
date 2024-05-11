@@ -12,9 +12,12 @@ from tkinter import filedialog
 from tkinter import PhotoImage, Toplevel, simpledialog
 import tkinter.scrolledtext
 
+# Global variables for TCP
 cwnd = 1  # Congestion window size (in segments)
 ssthresh = 65535  # Slow start threshold
 duplicate_acks = 0  # Counter for duplicate ACKs
+rtt = 0.5  # Estimated round-trip time (in seconds)
+timeout = 2 * rtt  # Timeout duration (in seconds)
 
 
 class StreamingServer:
@@ -164,6 +167,55 @@ class StreamingServer:
         for client in self.chat_clients:
             client.send(message)
 
+    def fileReceive(self, client, nickname):
+        try:
+            print("into receive method")
+            length = client.recv(1024)
+            print(f'Length: {length}')
+            length = length.decode('utf-8')
+            response = b''
+            got_len = 0
+            duplicate_acks = 0
+
+            while got_len < int(length):
+                data = client.recv(1024)
+                if data == b'':  # Connection closed
+                    break
+                print(data)
+                response += data
+                got_len += len(data)
+                client.send(b'ACK')  # Send ACK for received data
+
+                if data == b'DUPACK':
+                    duplicate_acks += 1
+
+                    # Fast retransmit
+                    if duplicate_acks >= 3:
+                        client.send(b'DUPACK')  # Notify sender for fast retransmit
+                        duplicate_acks = 0
+
+            response = pickle.loads(response)
+
+            if response['status'] == 'ERROR':
+                return
+
+            if not os.path.exists('./server_files'):
+                os.makedirs('./server_files')
+
+            filepath = os.path.join('./server_files', response['filename'])
+            print(f'Filepath: {filepath}')
+            print(f'Received content: {response["content"]}')
+
+            with open(filepath, 'wb') as f:
+                f.write(response['content'])
+
+            print('Received')
+            self.broadcastFile(filepath, nickname)
+
+        except Exception as e:
+            print(f"Error: {e}")
+            client.send(b'DUPACK')  # Send duplicate ACK for lost segment
+
     def receiveFile(self,client,nickname):
         try:
             print("into receive method")
@@ -198,43 +250,7 @@ class StreamingServer:
 
         except Exception as e:
             print(f"Error: {e}")
-    # def receiveFile(self, client, nickname):
-    #     try:
-    #         print("into receive method")
-    #         length = client.recv(1024)
-    #         print(f'Length: {length}')
-    #         length = length.decode('utf-8')
-    #         response = b''
-    #         got_len = 0
-
-    #         while got_len < int(length):
-    #             data = client.recv(1024)
-    #             print(data)
-    #             response += data
-    #             got_len += len(data)
-    #             client.send(b'ACK')  # Send ACK for received data
-
-    #         response = pickle.loads(response)
-
-    #         if response['status'] == 'ERROR':
-    #             return
-
-    #         if not os.path.exists('./server_files'):
-    #             os.makedirs('./server_files')
-
-    #         filepath = os.path.join('./server_files', response['filename'])
-    #         print(f'Filepath: {filepath}')
-    #         print(f'Received content: {response["content"]}')
-
-    #         with open(filepath, 'wb') as f:
-    #             f.write(response['content'])
-
-    #         print('Received')
-    #         self.broadcastFile(filepath, nickname)
-
-    #     except Exception as e:
-    #         print(f"Error: {e}")
-    #         client.send(b'DUPACK')  # Send duplicate ACK for lost segment
+    
 
     def broadcastFile(self, filepath, nickname):
         print("Starting to broadcast the file")
