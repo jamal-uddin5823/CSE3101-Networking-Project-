@@ -2,11 +2,11 @@ import socket
 import threading
 import pickle
 import os
-import tqdm
+import tqdm # type: ignore
 import struct
 
 HOST = socket.gethostbyname(socket.gethostname())
-PORT = 9000
+PORT = 9001
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.bind((HOST, PORT))

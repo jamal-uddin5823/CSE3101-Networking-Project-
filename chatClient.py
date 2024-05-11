@@ -8,9 +8,10 @@ import tkinter.scrolledtext
 from tkinter import PhotoImage, Toplevel, simpledialog
 from tkinter import filedialog
 import tqdm # type: ignore
+from tkinter import ttk
 
 HOST = socket.gethostbyname(socket.gethostname())
-PORT = 9000
+PORT = 9001
 sock: socket.socket
 
 # TCP Reno Parameters
@@ -38,58 +39,49 @@ class Client:
 
         self.running = True
 
-        # gui_thread = threading.Thread(target=self.gui_loop)
-
         receive_thread = threading.Thread(target=self.receive)
 
-        # gui_thread.start()
         receive_thread.start()
 
     def gui_loop(self):
         self.win = tkinter.Tk()
-        self.win.configure(bg="lightgray")
+        self.win.title("Resizable GUI")
 
-        self.chat_label = tkinter.Label(
-            self.win, text="Chat: ", bg="lightgray")
-        self.chat_label.configure(font=("Arial", 12))
-        self.chat_label.pack(padx=20, pady=5)
+        # Create a frame to contain all elements
+        main_frame = ttk.Frame(self.win)
+        main_frame.pack(fill=tkinter.BOTH, expand=True)
 
-        self.text_area = tkinter.scrolledtext.ScrolledText(self.win)
-        self.text_area.pack(padx=20, pady=5)
-        self.text_area.config(state='disabled')
+        # Create labels and text areas
+        self.chat_label = ttk.Label(main_frame, text="Chat: ")
+        self.chat_label.pack(padx=20, pady=(20, 5), anchor="w")
 
-        self.msg_label = tkinter.Label(
-            self.win, text="message: ", bg="lightgray")
-        self.msg_label.configure(font=("Arial", 12))
-        self.msg_label.pack(padx=20, pady=5)
+        self.text_area = tkinter.scrolledtext.ScrolledText(main_frame)
+        self.text_area.pack(fill=tkinter.BOTH, expand=True, padx=20, pady=5)
 
-        self.input_area = tkinter.Text(self.win, height=3)
-        self.input_area.pack(padx=20, pady=5)
+        self.msg_label = ttk.Label(main_frame, text="Message: ")
+        self.msg_label.pack(padx=20, pady=(5, 5), anchor="w")
 
-        self.send_button = tkinter.Button(
-            self.win, text="Send Text", command=self.write)
-        self.send_button.config(font=("Arial", 12))
-        self.send_button.pack(padx=20, pady=5)
-        
-        self.select_file_button = tkinter.Button(
-            self.win, text="Select File", command=self.selectFile)
-        self.select_file_button.config(font=("Arial", 12))
-        self.select_file_button.pack(padx=50, pady=5)
+        self.input_area = tkinter.Text(main_frame, height=3)
+        self.input_area.pack(fill=tkinter.BOTH, expand=True, padx=20, pady=(0, 5))
 
-        self.send_file_button = tkinter.Button(
-            self.win, text="Send File", command=self.sendFile)
-        self.send_file_button.config(font=("Arial", 12))
-        self.send_file_button.pack(padx=50, pady=5)
+        # Create buttons
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(padx=20, pady=(0, 20), anchor="e")
 
-        # self.recv_file_button = tkinter.Button(
-        #     self.win, text="Receive File", command=self.receiveFile)
-        # self.recv_file_button.config(font=("Arial", 12))
-        # self.recv_file_button.pack(padx=50, pady=5)
+        self.send_button = ttk.Button(button_frame, text="Send Text", command=self.write)
+        self.send_button.pack(side=tkinter.LEFT, padx=(0, 10))
+
+        self.select_file_button = ttk.Button(button_frame, text="Select File", command=self.selectFile)
+        self.select_file_button.pack(side=tkinter.LEFT, padx=(0, 10))
+
+        self.send_file_button = ttk.Button(button_frame, text="Send File", command=self.sendFile)
+        self.send_file_button.pack(side=tkinter.LEFT)
+
+        # Make the window resizable
+        self.win.resizable(True, True)
 
         self.gui_done = True
-
         self.win.protocol("WM_DELETE_WINDOW", self.stop)
-
         self.win.mainloop()
 
     def write(self):
