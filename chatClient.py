@@ -146,11 +146,6 @@ class Client:
         global filename
         try:
             self.sock.send('file'.encode('utf-8'))
-            # ack=self.sock.recv(1024)
-            # if ack.decode('utf-8') == 'ACK':
-            #     print('File sending started')
-            # else:
-            #     raise OSError('ACK file not received')
             with open(filename,'rb') as f:
                 content = f.read()
             lst = filename.split('/')

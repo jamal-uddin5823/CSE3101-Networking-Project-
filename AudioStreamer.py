@@ -5,16 +5,25 @@ import pickle
 import threading
 from queue import Queue
 import wave
+import os
+import tqdm
+import tkinter
+from tkinter import filedialog
+from tkinter import PhotoImage, Toplevel, simpledialog
+import tkinter.scrolledtext
 
 class StreamingServer:
-    def __init__(self, server_ip, video_port, audio_port, chunk_size=1024):
+    def __init__(self, server_ip, video_port, audio_port, chat_port, chunk_size=1024):
         self.server_ip = server_ip
         self.video_port = video_port
         self.audio_port = audio_port
+        self.chat_port = chat_port
         self.chunk_size = chunk_size
 
         self.video_clients = []
         self.audio_clients = []
+        self.chat_clients = []
+        self.nicknames = []
 
         # Video setup
         print("Accessing camera...")
@@ -39,6 +48,11 @@ class StreamingServer:
         self.audio_socket.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 1000000)
         self.audio_socket.bind((server_ip, audio_port))
 
+        self.chat_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.chat_socket.bind((server_ip, chat_port))
+        self.chat_socket.listen()
+
+        # self.chat_server_thread = threading.Thread(target=self.accept_chat_connection)
         self.accept_video_thread = threading.Thread(target=self.accept_video_connection)
         self.accept_audio_thread = threading.Thread(target=self.accept_audio_connection)
         self.video_stream_thread = threading.Thread(target=self.video_stream)
@@ -91,6 +105,145 @@ class StreamingServer:
                     self.stop()
                     break
 
+    def accept_chat_connection(self):
+        print(f'Chat server listening on {self.server_ip}:{self.chat_port}')
+        try:
+            while True:
+                client_sock, client_addr = self.chat_socket.accept()
+                print(f"Connected with {client_addr}")
+                client_sock.send("NICK".encode('utf-8'))
+                nickname = client_sock.recv(1024).decode('utf-8')
+                print(f"Nickname of the client is {nickname}")
+                self.nicknames.append(nickname)
+                self.chat_clients.append(client_sock)
+                self.broadcast(f"{nickname} connected to the server!\n".encode('utf-8'))
+                chat_thread = threading.Thread(target=self.handle, args=(client_sock,))
+                chat_thread.start()
+        except Exception as e:
+            print(f"Error: {e}")
+    
+    def handle(self,client):
+        while True:
+            try:
+                print("handle client entered")
+                message = client.recv(1024).decode('utf-8')
+                # client.send('ACK'.encode('utf-8'))
+                print("handle client entered 2")
+                print(message)
+                code = message[:4]
+                print("code : " + code)
+
+                if (code == '_me_'):
+                    message = message[4:]
+                    message = message.encode('utf-8')
+
+                    print(message)
+                    print(f"{self.nicknames[self.chat_clients.index(client)]}")
+                    self.broadcast(message)
+                    print("broadcast message done")
+                elif (code == 'file'):
+                    self.receiveFile(client,self.nicknames[self.chat_clients.index(client)])
+                else:
+                    raise Exception("Invalid code")
+            except:
+                index = self.chat_clients.index(client)
+                self.chat_clients.remove(client)
+                client.close()
+                nickname = self.nicknames[index]
+
+                self.nicknames.remove(nickname)
+                break
+
+    def broadcast(self,message):
+        for client in self.chat_clients:
+            client.send(message)
+
+    def receiveFile(self,client,nickname):
+        try:
+            print("into receive method")
+            length = client.recv(1024)  # 39 in client
+            print(f'Length: {length}')
+            length = length.decode('utf-8')
+            response = b''
+            got_len = 0
+            while got_len < int(length):
+                data = client.recv(1024)
+                print(data)
+                response += data
+                got_len += len(data)
+
+            response = pickle.loads(response)
+
+            if response['status'] == 'ERROR':
+                return
+            if not os.path.exists('./server_files'):
+                os.makedirs('./server_files')
+                
+            filepath = os.path.join('./server_files', response['filename'])
+            print(f'Filepath: {filepath}')
+
+            print(f'Received content: {response["content"]}')
+
+            with open(filepath, 'wb') as f:
+                f.write(response['content'])
+
+            print('Received')
+            self.broadcastFile(filepath,nickname)
+
+        except Exception as e:
+            print(f"Error: {e}")
+
+    def broadcastFile(self,filepath,nickname):
+        print("starting to broadcast the file")
+
+        filename = os.path.basename(filepath)
+
+        print(filepath)
+        print(filename)
+
+        for client in self.chat_clients:
+            client.send(f'FILE {nickname}'.encode('utf-8'))
+
+        for client in self.chat_clients:
+            try:
+                with open(filepath, 'rb') as f:
+                    content = f.read()
+                response = {
+                    'status': 'OK',
+                    'filename': filename,
+                    'content': content
+                }
+                success = True
+
+                print('file opened')
+            except FileNotFoundError:
+                print('File does not exist')
+                response = {
+                    'status': 'ERROR',
+                }
+                success = False
+
+            print(response)
+            response = pickle.dumps(response)
+
+            total_size = len(response)
+
+            with tqdm.tqdm(total=total_size, unit='B', unit_scale=True, unit_divisor=1024) as progress:
+                sent_len = 0
+                chunk_size = 4096
+
+                while sent_len < total_size:
+                    chunk = response[sent_len:sent_len+chunk_size]
+                    sent_len += len(chunk)
+                    client.send(chunk)
+                    # progress.update(len(chunk))
+
+            if success:
+                print(f'Broadcast {filename} to Client: {client}')
+            else:
+                print('Try again.')
+
+
     def accept_video_connection(self):
         print("Waiting for video connections...")
         while not self.stop_event.is_set():
@@ -130,7 +283,9 @@ class StreamingServer:
         self.accept_audio_thread.start()
         self.video_stream_thread.start()
         self.audio_stream_thread.start()
+        # self.chat_server_thread.start()
         self.display_thread.start()
+        self.accept_chat_connection()
 
     def stop_video(self):
         self.video_socket.close()
@@ -163,39 +318,11 @@ class StreamingServer:
     def stop(self):
         self.stop_video()
         self.stop_audio()
-        # self.video_socket.close()
-        # self.audio_socket.close()
-        # print('Cleaning up...')
-        # self.stop_event.set()
-        # print('Destroying window...')
-        # cv2.destroyAllWindows()
-        # print('Closing camera...')
-        # self.cap.release()
-        # print('Closing video stream thread...')
-        # self.video_stream_thread.join()
-        # print('Closing audio stream thread...')
-        # self.audio_stream_thread.join()
-        # print('Closing accept video thread...')
-        # # self.accept_video_thread.join()
-        # print('Closing accept audio thread...')
-        # # self.accept_audio_thread.join()
-        # self.audio_input_stream.stop_stream()
-        # self.audio_input_stream.close()
-        # self.audio.terminate()
-        # print('Saving audio to file...')
-        # sound_file = wave.open("output.wav", "wb")
-        # sound_file.setnchannels(1)
-        # sound_file.setsampwidth(self.audio.get_sample_size(pyaudio.paInt16))
-        # sound_file.setframerate(44100)
-        # sound_file.writeframes(b''.join(self.audio_frames))
-        # sound_file.close()
-        # print('Closing display thread...')
-        # self.display_thread.join()
-
         exit()
 
+
 # Usage example
-streaming_server = StreamingServer(socket.gethostbyname(socket.gethostname()), 8000, 8001)
+streaming_server = StreamingServer(socket.gethostbyname(socket.gethostname()), 8000, 8001,9000)
 streaming_server.start()
 
 if cv2.waitKey(25) == ord('q'):
