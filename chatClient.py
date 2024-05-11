@@ -45,21 +45,21 @@ class Client:
 
     def gui_loop(self):
         self.win = tkinter.Tk()
-        self.win.title("Resizable GUI")
+        self.win.title("ShouldStream")
 
         # Create a frame to contain all elements
         main_frame = ttk.Frame(self.win)
         main_frame.pack(fill=tkinter.BOTH, expand=True)
 
         # Create labels and text areas
-        self.chat_label = ttk.Label(main_frame, text="Chat: ", font=("Georgia", 20))
-        self.chat_label.pack(padx=20, pady=(20, 5), anchor="w")
+        self.chat_label = ttk.Label(main_frame, text="Chat Room", font=("Georgia", 20))
+        self.chat_label.pack(padx=20, pady=(20, 5), anchor="center")
 
         self.text_area = tkinter.scrolledtext.ScrolledText(main_frame, font=("Georgia", 17))
         self.text_area.pack(fill=tkinter.BOTH, expand=True, padx=20, pady=5)
 
-        self.msg_label = ttk.Label(main_frame, text="Message: ", font=("Georgia", 20))
-        self.msg_label.pack(padx=20, pady=(5, 5), anchor="w")
+        self.msg_label = ttk.Label(main_frame, text="Text Your Message", font=("Georgia", 20))
+        self.msg_label.pack(padx=20, pady=(5, 5), anchor="center")
 
         self.input_area = tkinter.Text(main_frame, height=3, font=("Georgia", 17))
         self.input_area.pack(fill=tkinter.BOTH, expand=True, padx=20, pady=(0, 5))
