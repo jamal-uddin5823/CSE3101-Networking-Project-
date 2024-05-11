@@ -11,7 +11,7 @@ import tqdm # type: ignore
 from tkinter import ttk
 
 HOST = socket.gethostbyname(socket.gethostname())
-PORT = 9001
+PORT = 9002
 sock: socket.socket
 
 # TCP Reno Parameters
@@ -52,16 +52,16 @@ class Client:
         main_frame.pack(fill=tkinter.BOTH, expand=True)
 
         # Create labels and text areas
-        self.chat_label = ttk.Label(main_frame, text="Chat: ")
+        self.chat_label = ttk.Label(main_frame, text="Chat: ", font=("Georgia", 20))
         self.chat_label.pack(padx=20, pady=(20, 5), anchor="w")
 
-        self.text_area = tkinter.scrolledtext.ScrolledText(main_frame)
+        self.text_area = tkinter.scrolledtext.ScrolledText(main_frame, font=("Georgia", 17))
         self.text_area.pack(fill=tkinter.BOTH, expand=True, padx=20, pady=5)
 
-        self.msg_label = ttk.Label(main_frame, text="Message: ")
+        self.msg_label = ttk.Label(main_frame, text="Message: ", font=("Georgia", 20))
         self.msg_label.pack(padx=20, pady=(5, 5), anchor="w")
 
-        self.input_area = tkinter.Text(main_frame, height=3)
+        self.input_area = tkinter.Text(main_frame, height=3, font=("Georgia", 17))
         self.input_area.pack(fill=tkinter.BOTH, expand=True, padx=20, pady=(0, 5))
 
         # Create buttons

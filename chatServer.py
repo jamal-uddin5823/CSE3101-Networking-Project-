@@ -6,7 +6,7 @@ import tqdm # type: ignore
 import struct
 
 HOST = socket.gethostbyname(socket.gethostname())
-PORT = 9001
+PORT = 9002
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.bind((HOST, PORT))
