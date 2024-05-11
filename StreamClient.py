@@ -1,3 +1,4 @@
+import time
 import cv2
 import socket
 import pickle
@@ -10,6 +11,11 @@ from tkinter import PhotoImage, Toplevel, simpledialog
 from tkinter import filedialog
 import tqdm # type: ignore
 import os
+
+cwnd = 1  # Congestion window size (in segments)
+ssthresh = 65535  # Slow start threshold
+duplicate_acks = 0  # Counter for duplicate ACKs
+
 
 class Audience:
     server_ip = socket.gethostbyname(socket.gethostname())
@@ -133,10 +139,10 @@ class Audience:
                     print("Client nickname: " + self.nickname)
                     self.chat_socket.send(self.nickname.encode('utf-8'))
 
-                    print('Client nickname: (Meherun) sent to the server')
+                    print(f'Client nickname: {nickname} sent to the server')
                 if message.startswith('FILE'):
-                    file,nickname = message.split(' ')
-                    self.receiveFile(nickname)
+                    file,nickname,filename = message.split(' ')
+                    self.receiveFile(nickname,filename)
                 else:
                     if self.gui_done:
                         self.text_area.config(state='normal')
@@ -198,32 +204,94 @@ class Audience:
 
         if success: print(f'Uploaded {filename}')
         else: print('Try again.')
+    # def sendFile(self):
+    #     global cwnd, ssthresh, duplicate_acks
 
-    def receiveFile(self,nickname):
+    #     try:
+    #         self.chat_socket.send('file'.encode('utf-8'))
+    #         with open(filename, 'rb') as f:
+    #             content = f.read()
+    #         lst = filename.split('/')
+    #         filepath = lst[-1]
+    #         response = {
+    #             'status': 'OK',
+    #             'filename': filepath,
+    #             'content': content
+    #         }
+    #         success = True
+    #     except FileNotFoundError:
+    #         print('File does not exist')
+    #         response = {
+    #             'status': 'ERROR',
+    #         }
+    #         success = False
+
+    #     response = pickle.dumps(response)
+    #     total_size = len(response)
+    #     self.chat_socket.send(f'{total_size}'.encode())
+    #     sent_len = 0
+    #     segment_size = max(cwnd, 1) * 1024  # Assuming 1 segment = 1024 bytes
+
+    #     while sent_len < total_size:
+    #         start_time = time.time()
+    #         end_time = start_time + 1  # Timeout after 1 second
+
+    #         while time.time() < end_time:
+    #             chunk_size = min(segment_size, total_size - sent_len)
+    #             chunk = response[sent_len:sent_len + chunk_size]
+    #             self.chat_socket.send(chunk)
+    #             sent_len += len(chunk)
+
+    #             # Slow start
+    #             if cwnd < ssthresh:
+    #                 cwnd += 1
+
+    #             # Congestion avoidance
+    #             else:
+    #                 cwnd += 1 / cwnd
+
+    #             # Wait for ACK or timeout
+    #             try:
+    #                 ack = self.chat_socket.recv(1024)
+    #                 if ack == b'ACK':
+    #                     duplicate_acks = 0
+    #                 elif ack == b'DUPACK':
+    #                     duplicate_acks += 1
+
+    #                     # Fast retransmit
+    #                     if duplicate_acks >= 3:
+    #                         ssthresh = cwnd / 2
+    #                         cwnd = ssthresh + 3
+    #                         # Retransmit lost segment
+    #             except socket.timeout:
+    #                 # Timeout, retransmit lost segment
+    #                 ssthresh = cwnd / 2
+    #                 cwnd = 1
+
+    #     if success:
+    #         print(f'Uploaded {filename}')
+    #     else:
+    #         print('Try again.')
+
+    def receiveFile(self, nickname,filename):
         try:
-            print('entered into the receiveFile method')
-            message = self.chat_socket.recv(1024)
-            print(f'Message received: {message}')
-            message = pickle.loads(message)
-            print(f'Message received: {message}')
-            filename = message['filename']
-            content = message['content']
-            print(f'Filename: {filename}')
-            print(f'Content: {content}')
-            if not os.path.exists(self.nickname):
-                os.makedirs(self.nickname)
-            filepath=os.path.join(self.nickname,filename)
+            
+            filepath = os.path.join(self.nickname, filename)  # Decode the filename, replace invalid bytes
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
             with open(filepath, 'wb') as f:
-                f.write(content)
+                while True:
+                    chunk = self.chat_socket.recv(4096)
+                    if not chunk:
+                        break
+                    f.write(chunk)
 
-            print(f'File received: {filename}')
-
+            print(f'File received: {filepath}')
             if self.gui_done:
                 self.text_area.config(state='normal')
                 self.text_area.insert('end', f'{nickname} sent a file: {filename}\n')
                 self.text_area.yview('end')
                 self.text_area.config(state='disabled')
-            
         except Exception as e:
             print(f'Error: {e}')
 

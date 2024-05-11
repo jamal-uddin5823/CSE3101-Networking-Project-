@@ -133,7 +133,7 @@ class Audience:
                     print("Client nickname: " + self.nickname)
                     self.chat_socket.send(self.nickname.encode('utf-8'))
 
-                    print('Client nickname: (Meherun) sent to the server')
+                    print(f'Client nickname: {nickname} sent to the server')
                 if message.startswith('FILE'):
                     file,nickname = message.split(' ')
                     self.receiveFile(nickname)
@@ -154,7 +154,7 @@ class Audience:
     def selectFile(self):
         global filename
         filename = filedialog.askopenfilename(initialdir=os.getcwd(
-        ), title="Select Image File", filetypes=(('Text files', '*.txt'), ('All files', '*.*')))
+        ), title="Select File", filetypes=(('All files', '*.*')))
     
     def sendFile(self):
         global filename

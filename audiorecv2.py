@@ -1,4 +1,4 @@
-from AudioReceiver import Audience
+from StreamClient import Audience
 import socket
 
 

@@ -12,6 +12,11 @@ from tkinter import filedialog
 from tkinter import PhotoImage, Toplevel, simpledialog
 import tkinter.scrolledtext
 
+cwnd = 1  # Congestion window size (in segments)
+ssthresh = 65535  # Slow start threshold
+duplicate_acks = 0  # Counter for duplicate ACKs
+
+
 class StreamingServer:
     def __init__(self, server_ip, video_port, audio_port, chat_port, chunk_size=1024):
         self.server_ip = server_ip
@@ -42,6 +47,7 @@ class StreamingServer:
                                                   channels=1,
                                                   rate=44100,
                                                   input=True,
+                                                  input_device_index=0,
                                                   frames_per_buffer=self.chunk_size)
         self.audio_frames = []
         self.audio_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -125,22 +131,22 @@ class StreamingServer:
     def handle(self,client):
         while True:
             try:
-                print("handle client entered")
+                # print("handle client entered")
                 message = client.recv(1024).decode('utf-8')
                 # client.send('ACK'.encode('utf-8'))
-                print("handle client entered 2")
-                print(message)
+                # print("handle client entered 2")
+                # print(message)
                 code = message[:4]
-                print("code : " + code)
+                # print("code : " + code)
 
                 if (code == '_me_'):
                     message = message[4:]
+                    print(message)
                     message = message.encode('utf-8')
 
-                    print(message)
-                    print(f"{self.nicknames[self.chat_clients.index(client)]}")
+                    # print(f"{self.nicknames[self.chat_clients.index(client)]}")
                     self.broadcast(message)
-                    print("broadcast message done")
+                    # print("broadcast message done")
                 elif (code == 'file'):
                     self.receiveFile(client,self.nicknames[self.chat_clients.index(client)])
                 else:
@@ -192,56 +198,63 @@ class StreamingServer:
 
         except Exception as e:
             print(f"Error: {e}")
+    # def receiveFile(self, client, nickname):
+    #     try:
+    #         print("into receive method")
+    #         length = client.recv(1024)
+    #         print(f'Length: {length}')
+    #         length = length.decode('utf-8')
+    #         response = b''
+    #         got_len = 0
 
-    def broadcastFile(self,filepath,nickname):
-        print("starting to broadcast the file")
+    #         while got_len < int(length):
+    #             data = client.recv(1024)
+    #             print(data)
+    #             response += data
+    #             got_len += len(data)
+    #             client.send(b'ACK')  # Send ACK for received data
 
+    #         response = pickle.loads(response)
+
+    #         if response['status'] == 'ERROR':
+    #             return
+
+    #         if not os.path.exists('./server_files'):
+    #             os.makedirs('./server_files')
+
+    #         filepath = os.path.join('./server_files', response['filename'])
+    #         print(f'Filepath: {filepath}')
+    #         print(f'Received content: {response["content"]}')
+
+    #         with open(filepath, 'wb') as f:
+    #             f.write(response['content'])
+
+    #         print('Received')
+    #         self.broadcastFile(filepath, nickname)
+
+    #     except Exception as e:
+    #         print(f"Error: {e}")
+    #         client.send(b'DUPACK')  # Send duplicate ACK for lost segment
+
+    def broadcastFile(self, filepath, nickname):
+        print("Starting to broadcast the file")
         filename = os.path.basename(filepath)
-
         print(filepath)
         print(filename)
 
         for client in self.chat_clients:
-            client.send(f'FILE {nickname}'.encode('utf-8'))
+            client.send(f'FILE {nickname} {filename}'.encode('utf-8'))
 
-        for client in self.chat_clients:
-            try:
-                with open(filepath, 'rb') as f:
-                    content = f.read()
-                response = {
-                    'status': 'OK',
-                    'filename': filename,
-                    'content': content
-                }
-                success = True
-
-                print('file opened')
-            except FileNotFoundError:
-                print('File does not exist')
-                response = {
-                    'status': 'ERROR',
-                }
-                success = False
-
-            print(response)
-            response = pickle.dumps(response)
-
-            total_size = len(response)
-
-            with tqdm.tqdm(total=total_size, unit='B', unit_scale=True, unit_divisor=1024) as progress:
-                sent_len = 0
-                chunk_size = 4096
-
-                while sent_len < total_size:
-                    chunk = response[sent_len:sent_len+chunk_size]
-                    sent_len += len(chunk)
-                    client.send(chunk)
-                    # progress.update(len(chunk))
-
-            if success:
-                print(f'Broadcast {filename} to Client: {client}')
-            else:
-                print('Try again.')
+        try:
+            with open(filepath, 'rb') as f:
+                chunk = f.read(4096)  # Read the first chunk
+                while chunk:
+                    for client in self.chat_clients:
+                        client.send(chunk)  # Send the chunk to each client
+                    chunk = f.read(4096)  # Read the next chunk
+            print(f'Broadcast {filename} to all clients')
+        except FileNotFoundError:
+            print('File does not exist')
 
 
     def accept_video_connection(self):
