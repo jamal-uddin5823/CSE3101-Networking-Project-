@@ -28,8 +28,8 @@ python streamer.py
 python audiorecv.py
 ```
 ![Enter nickname](/images/1.png)
-![Enter nickname](/images/3.png)
-![Enter nickname](/images/Chatbox.png)
+![stream](/images/3.png)
+![chatbox](/images/Chatbox.png)
 
 
 
