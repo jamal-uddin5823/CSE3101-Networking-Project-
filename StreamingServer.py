@@ -246,6 +246,7 @@ class StreamingServer:
                 f.write(response['content'])
 
             print('Received')
+            print('Broadcasting')
             self.broadcastFile(filepath,nickname)
 
         except Exception as e:

@@ -39,7 +39,7 @@ class Audience:
 
         self.video_socket.bind((self.ip, self.video_port))
         self.audio_socket.bind((self.ip, self.audio_port))
-        self.chat_socket.connect((self.ip, Audience.server_chat_port))
+        self.chat_socket.connect((Audience.server_ip, Audience.server_chat_port))
 
         print(f'Connected to video stream at {self.ip}:{self.video_port}')
         print(f'Connected to audio stream at {self.ip}:{self.audio_port}')
